@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishGuard — AI Threat Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS & RESET
+============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Neutrals */
+  --c-white:      #ffffff;
+  --c-bg:         #f5f6f8;
+  --c-surface:    #ffffff;
+  --c-border:     #e3e6ec;
+  --c-border-mid: #d0d5e0;
+  --c-text-1:     #111827;
+  --c-text-2:     #374151;
+  --c-text-3:     #6b7280;
+  --c-text-4:     #9ca3af;
+
+  /* Semantic – safe */
+  --c-safe:       #166534;
+  --c-safe-bg:    #f0fdf4;
+  --c-safe-bd:    #bbf7d0;
+
+  /* Semantic – danger */
+  --c-danger:     #991b1b;
+  --c-danger-bg:  #fff1f2;
+  --c-danger-bd:  #fecaca;
+
+  /* Semantic – warn */
+  --c-warn:       #92400e;
+  --c-warn-bg:    #fffbeb;
+  --c-warn-bd:    #fde68a;
+
+  /* Accent */
+  --c-accent:     #1d4ed8;
+  --c-accent-bg:  #eff6ff;
+  --c-accent-bd:  #bfdbfe;
+
+  /* Sidebar */
+  --sidebar-w:    220px;
+
+  /* Type */
+  --f-body:       'DM Sans', system-ui, sans-serif;
+  --f-mono:       'DM Mono', 'Menlo', monospace;
+
+  /* Radius */
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+
+  /* Shadow */
+  --s-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --s-md:  0 4px 12px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04);
+}
+
+html   { font-size: 15px; scroll-behavior: smooth; }
+body   {
+  font-family: var(--f-body);
+  background:  var(--c-bg);
+  color:       var(--c-text-1);
+  min-height:  100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   LAYOUT SHELL
+============================================================ */
+.shell { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  display: flex; flex-direction: column;
+  position: fixed; inset: 0 auto 0 0;
+  z-index: 200;
+  animation: sb-in .4s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes sb-in { from { opacity:0; transform:translateX(-18px); } to { opacity:1; transform:none; } }
+
+.sb-brand {
+  padding: 20px 18px 16px;
+  border-bottom: 1px solid var(--c-border);
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none;
+}
+.sb-logo {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--c-text-1);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.sb-logo svg { width: 17px; height: 17px; }
+.sb-name { font-size: 14.5px; font-weight: 600; color: var(--c-text-1); letter-spacing: -.2px; }
+.sb-tag  { font-size: 10px; font-weight: 500; color: var(--c-text-4);
+           letter-spacing: .5px; text-transform: uppercase; display: block; }
+
+.sb-nav { padding: 14px 10px; flex: 1; }
+.sb-group-label {
+  font-size: 10px; font-weight: 600; color: var(--c-text-4);
+  letter-spacing: .7px; text-transform: uppercase;
+  padding: 0 8px; margin-bottom: 5px; display: block;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 8px 10px; border: none; background: none;
+  font-family: var(--f-body); font-size: 13.5px;
+  color: var(--c-text-3); cursor: pointer;
+  border-radius: var(--r-sm); margin-bottom: 1px;
+  transition: background .12s, color .12s;
+  text-align: left;
+}
+.nav-item svg    { width: 15px; height: 15px; opacity: .6; flex-shrink: 0; }
+.nav-item:hover  { background: var(--c-bg); color: var(--c-text-2); }
+.nav-item.active { background: #eef2ff; color: #3730a3; font-weight: 500; }
+.nav-item.active svg { opacity: 1; color: #3730a3; }
+
+.sb-footer {
+  padding: 13px 16px;
+  border-top: 1px solid var(--c-border);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; color: var(--c-text-4);
+}
+.pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--c-safe); flex-shrink: 0;
+  animation: pulse 2.8s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+/* ── Main ── */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+
+/* Topbar */
+.topbar {
+  background: var(--c-surface); border-bottom: 1px solid var(--c-border);
+  padding: 0 30px; height: 54px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  animation: top-in .35s ease both;
+}
+@keyframes top-in { from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:none;} }
+.tb-left  { display: flex; align-items: baseline; gap: 5px; }
+.tb-title { font-size: 13.5px; font-weight: 500; color: var(--c-text-2); }
+.tb-sub   { font-size: 13px;   color: var(--c-text-4); }
+.tb-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 500;
+  color: var(--c-safe);
+  background: var(--c-safe-bg); border: 1px solid var(--c-safe-bd);
+  border-radius: 20px; padding: 4px 12px;
+}
+
+/* Content */
+.content {
+  padding: 28px 30px 72px;
+  max-width: 760px;
+  animation: fade-up .38s .06s ease both;
+}
+@keyframes fade-up { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
+
+/* ============================================================
+   SECTION HEADING
+============================================================ */
+.sec-head { margin-bottom: 18px; }
+.sec-head h2 {
+  font-size: 16.5px; font-weight: 600; color: var(--c-text-1);
+  letter-spacing: -.25px; margin-bottom: 4px;
+}
+.sec-head p {
+  font-size: 13px; color: var(--c-text-3); line-height: 1.55; max-width: 580px;
+}
+
+/* ============================================================
+   CARD
+============================================================ */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--s-sm);
+}
+.card-body { padding: 22px 24px; }
+
+/* ============================================================
+   FORM
+============================================================ */
+.f-label {
+  display: block; font-size: 13px; font-weight: 500;
+  color: var(--c-text-2); margin-bottom: 6px;
+}
+.f-hint { font-size: 12px; color: var(--c-text-4); font-weight: 400; margin-left: 3px; }
+
+input[type="text"], textarea {
+  width: 100%;
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  color: var(--c-text-1);
+  font-family: var(--f-mono); font-size: 13px;
+  padding: 10px 13px; outline: none; resize: vertical; line-height: 1.6;
+  transition: border-color .14s, box-shadow .14s, background .14s;
+}
+textarea { min-height: 124px; }
+input[type="text"]:focus, textarea:focus {
+  background: var(--c-surface);
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 3px var(--c-accent-bg);
+}
+input::placeholder, textarea::placeholder { color: var(--c-text-4); }
+
+/* Notice */
+.notice {
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 9px 12px; margin-top: 10px;
+  background: var(--c-warn-bg); border: 1px solid var(--c-warn-bd);
+  border-radius: var(--r-sm);
+  font-size: 12px; color: var(--c-warn); line-height: 1.55;
+}
+.notice-i { flex-shrink: 0; font-style: normal; }
+
+/* Buttons */
+.btn-row { display: flex; gap: 9px; margin-top: 18px; }
+
+.btn-primary {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 22px;
+  background: var(--c-text-1); color: var(--c-white);
+  border: 1px solid var(--c-text-1); border-radius: var(--r-md);
+  font-family: var(--f-body); font-size: 13.5px; font-weight: 500; letter-spacing: -.1px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.14);
+  transition: background .13s, box-shadow .13s, transform .08s;
+}
+.btn-primary:hover   { background: #1f2937; box-shadow: var(--s-md); }
+.btn-primary:active  { transform: scale(.985); }
+.btn-primary:disabled{ background: var(--c-border); border-color: var(--c-border); cursor: not-allowed; box-shadow: none; }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 10px 16px;
+  background: var(--c-surface); color: var(--c-text-3);
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  font-family: var(--f-body); font-size: 13.5px; cursor: pointer;
+  transition: background .13s, border-color .13s;
+}
+.btn-ghost:hover { background: var(--c-bg); border-color: var(--c-border-mid); color: var(--c-text-2); }
+
+/* Spinner */
+.sp {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.25);
+  border-top-color: #fff; display: none;
+  animation: spin .6s linear infinite;
+}
+.btn-primary.busy .sp  { display: block; }
+.btn-primary.busy .lbl { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   RESULT PANEL — appears below the input card
+============================================================ */
+#result {
+  margin-top: 18px;
+  display: none;
+}
+#result.show {
+  display: block;
+  animation: res-in .32s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes res-in { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+
+/* Verdict header */
+.verdict {
+  display: flex; align-items: flex-start; gap: 13px;
+  padding: 18px 20px;
+  border: 1px solid; border-bottom: none;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.verdict.safe   { background: var(--c-safe-bg);   border-color: var(--c-safe-bd);   }
+.verdict.danger { background: var(--c-danger-bg);  border-color: var(--c-danger-bd); }
+
+.v-icon {
+  width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700;
+}
+.verdict.safe   .v-icon { background: rgba(22,101,52,.10); color: var(--c-safe);   }
+.verdict.danger .v-icon { background: rgba(153,27,27,.10); color: var(--c-danger); }
+
+.v-title { font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
+.verdict.safe   .v-title { color: var(--c-safe);   }
+.verdict.danger .v-title { color: var(--c-danger); }
+.v-sub {
+  font-size: 11.5px; font-family: var(--f-mono);
+  color: var(--c-text-4); margin-top: 4px; line-height: 1.4;
+}
+
+/* Result body */
+.r-body {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-top: 1px solid var(--c-border-mid);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  padding: 20px 22px 22px;
+}
+
+/* Confidence bar */
+.conf { margin-bottom: 18px; }
+.conf-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.conf-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .55px;
+  text-transform: uppercase; color: var(--c-text-4);
+}
+.conf-pct { font-family: var(--f-mono); font-size: 12.5px; color: var(--c-text-3); }
+.bar-track { height: 4px; background: var(--c-bg); border-radius: 99px; overflow: hidden; }
+.bar-fill  {
+  height: 100%; border-radius: 99px; width: 0;
+  transition: width .9s cubic-bezier(.4,0,.2,1);
+}
+.bar-fill.safe   { background: var(--c-safe);   }
+.bar-fill.danger { background: var(--c-danger); }
+
+/* Score tiles */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.tile {
+  padding: 13px 15px; border-radius: var(--r-md);
+  background: var(--c-bg); border: 1px solid var(--c-border);
+}
+.tile-label { font-size: 10.5px; font-weight: 500; letter-spacing: .4px; text-transform: uppercase; color: var(--c-text-4); margin-bottom: 5px; }
+.tile-value { font-family: var(--f-mono); font-size: 22px; font-weight: 500; letter-spacing: -.5px; }
+.tile-value.safe    { color: var(--c-safe);   }
+.tile-value.danger  { color: var(--c-danger); }
+.tile-value.neutral { color: var(--c-text-2); }
+
+/* Divider */
+.divider { height: 1px; background: var(--c-border); margin: 0 0 16px; }
+
+/* Section label */
+.sec-label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .55px;
+  text-transform: uppercase; color: var(--c-text-4); margin-bottom: 10px; display: block;
+}
+
+/* Feature table */
+.feat-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.feat-table tr { border-bottom: 1px solid var(--c-border); }
+.feat-table tr:last-child { border-bottom: none; }
+.feat-table tr:hover { background: var(--c-bg); }
+.feat-table td { padding: 8px 9px; vertical-align: middle; }
+.feat-table td:first-child { color: var(--c-text-3); width: 62%; }
+.feat-table td:last-child  { font-family: var(--f-mono); font-size: 12.5px; font-weight: 500; color: var(--c-text-1); text-align: right; }
+
+/* Risk signals */
+.risk-item {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 9px 12px; margin-bottom: 6px; border-radius: var(--r-sm);
+  background: var(--c-danger-bg); border: 1px solid var(--c-danger-bd);
+  font-size: 12.5px; color: var(--c-danger); line-height: 1.5;
+  animation: risk-in .22s ease both;
+}
+@keyframes risk-in { from{opacity:0; transform:translateX(-5px);} to{opacity:1; transform:none;} }
+.risk-bullet { flex-shrink: 0; font-size: 11px; opacity: .65; margin-top: 2px; }
+
+/* Safe note */
+.safe-note {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 14px; border-radius: var(--r-md);
+  background: var(--c-safe-bg); border: 1px solid var(--c-safe-bd);
+  font-size: 13px; color: var(--c-safe); font-weight: 500;
+}
+
+/* Error toast */
+.error-box {
+  padding: 12px 16px; border-radius: var(--r-md);
+  background: var(--c-danger-bg); border: 1px solid var(--c-danger-bd);
+  font-size: 13px; color: var(--c-danger); line-height: 1.55;
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+@media (max-width: 660px) {
+  .sidebar { display: none; }
+  .main    { margin-left: 0; }
+  .content, .topbar { padding-left: 16px; padding-right: 16px; }
+  .tiles   { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ═══════════════ SIDEBAR ═══════════════ -->
+  <aside class="sidebar">
+
+    <a class="sb-brand" href="#">
+      <div class="sb-logo">
+        <!-- Shield icon -->
+        <svg viewBox="0 0 20 20" fill="none">
+          <path d="M10 2L4 4.5V9.5C4 13.1 6.55 16.4 10 17.5C13.45 16.4 16 13.1 16 9.5V4.5L10 2Z"
+                fill="white" fill-opacity=".9"/>
+          <path d="M7.5 10.2L9 11.7L12.5 8"
+                stroke="#111827" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <span class="sb-name">PhishGuard</span>
+        <span class="sb-tag">Threat Detection</span>
+      </div>
+    </a>
+
+    <nav class="sb-nav">
+      <span class="sb-group-label">Detection</span>
+
+      <button class="nav-item active" onclick="switchTab('url')" id="nav-url">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M6 9.5C7 10.5 8.8 10.6 9.9 9.5L12 7.4C13.1 6.3 13.1 4.6 12 3.5S9.2 2.4 8.1 3.5L7 4.5"
+                stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M10 6.5C9 5.5 7.2 5.4 6.1 6.5L4 8.6C2.9 9.7 2.9 11.4 4 12.5S6.8 13.6 7.9 12.5L9 11.5"
+                stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        URL Analysis
+      </button>
+
+      <button class="nav-item" onclick="switchTab('email')" id="nav-email">
+        <svg viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="3.5" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M2 5.5L8 9.5L14 5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        Email Detection
+      </button>
+
+      <button class="nav-item" onclick="switchTab('sms')" id="nav-sms">
+        <svg viewBox="0 0 16 16" fill="none">
+          <rect x="4" y="1.5" width="8" height="13" rx="2" stroke="currentColor" stroke-width="1.3"/>
+          <circle cx="8" cy="12" r=".85" fill="currentColor"/>
+        </svg>
+        SMS Detection
+      </button>
+    </nav>
+
+    <div class="sb-footer">
+      <div class="pulse" id="pulse-dot"></div>
+      <span id="sb-status">Initialising…</span>
+    </div>
+
+  </aside>
+
+  <!-- ═══════════════ MAIN ═══════════════ -->
+  <div class="main">
+
+    <header class="topbar">
+      <div class="tb-left">
+        <span class="tb-title" id="tb-title">URL Analysis</span>
+        <span class="tb-sub"   id="tb-sub">— Paste any URL to inspect</span>
+      </div>
+      <div class="tb-badge" id="tb-badge">
+        <div class="pulse"></div>
+        AI Ready
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- ── URL Panel ── -->
+      <div id="panel-url">
+        <div class="sec-head">
+          <h2>URL Threat Analysis</h2>
+          <p>87 structural and lexical features are extracted from the URL and classified by a Random Forest model trained on 11,430 labelled URLs.</p>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <label class="f-label" for="url-input">URL</label>
+            <input
+              type="text" id="url-input"
+              placeholder="https://example.com/path?query=value"
+              autocomplete="off" spellcheck="false"
+            >
+            <div class="notice">
+              <em class="notice-i">ⓘ</em>
+              <span>Page-content features (hyperlinks, login forms, media ratio) require live page fetching and are excluded from this static analysis. All structural URL features are fully computed.</span>
+            </div>
+            <div class="btn-row">
+              <button class="btn-primary" id="btn-url" onclick="runScan()">
+                <div class="sp"></div><span class="lbl">Analyse URL</span>
+              </button>
+              <button class="btn-ghost" onclick="clearAll()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Email Panel ── -->
+      <div id="panel-email" style="display:none">
+        <div class="sec-head">
+          <h2>Email Phishing Detection</h2>
+          <p>TF-IDF vectorisation + Logistic Regression trained on six phishing corpora: CEAS-08, Enron, Ling, Nigerian Fraud, SpamAssassin, and a curated phishing set.</p>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <label class="f-label" for="email-input">
+              Email content
+              <span class="f-hint">— subject line and body text</span>
+            </label>
+            <textarea
+              id="email-input"
+              placeholder="Paste the complete email here. Include the subject line followed by the body for best accuracy.
+
+Example:
+Subject: Your account requires immediate verification
+Dear Customer, unusual activity was detected on your account. Verify your identity within 24 hours to avoid suspension. Click the link below to proceed."
+            ></textarea>
+            <div class="btn-row">
+              <button class="btn-primary" id="btn-email" onclick="runScan()">
+                <div class="sp"></div><span class="lbl">Analyse Email</span>
+              </button>
+              <button class="btn-ghost" onclick="clearAll()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SMS Panel ── -->
+      <div id="panel-sms" style="display:none">
+        <div class="sec-head">
+          <h2>SMS Spam Detection</h2>
+          <p>Same TF-IDF model fine-tuned on SMS language patterns from the UCI SMS Spam Collection and the Spam_SMS dataset.</p>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <label class="f-label" for="sms-input">SMS message text</label>
+            <textarea
+              id="sms-input"
+              style="min-height:100px"
+              placeholder="Paste the SMS message here.
+
+Example:
+Congratulations! You have been selected to receive a £1,000 reward. Claim before midnight by visiting the link. Reply STOP to opt out."
+            ></textarea>
+            <div class="btn-row">
+              <button class="btn-primary" id="btn-sms" onclick="runScan()">
+                <div class="sp"></div><span class="lbl">Analyse SMS</span>
+              </button>
+              <button class="btn-ghost" onclick="clearAll()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════ RESULT ═══════════════ -->
+      <div id="result">
+
+        <!-- Verdict header -->
+        <div class="verdict" id="verdict">
+          <div class="v-icon" id="v-icon"></div>
+          <div>
+            <div class="v-title" id="v-title"></div>
+            <div class="v-sub"   id="v-sub"></div>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="r-body" id="r-body">
+
+          <!-- Confidence bar -->
+          <div class="conf" id="conf">
+            <div class="conf-header">
+              <span class="conf-label">Model Confidence</span>
+              <span class="conf-pct" id="conf-pct"></span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" id="bar-fill"></div>
+            </div>
+          </div>
+
+          <!-- Score tiles -->
+          <div class="tiles" id="tiles"></div>
+
+          <!-- URL features -->
+          <div id="feat-sec" style="display:none">
+            <div class="divider"></div>
+            <span class="sec-label">URL Feature Breakdown</span>
+            <table class="feat-table" id="feat-table"></table>
+          </div>
+
+          <!-- Risk signals -->
+          <div id="sig-sec" style="display:none">
+            <div class="divider"></div>
+            <span class="sec-label" style="margin-bottom:10px">Risk Signals Detected</span>
+            <div id="sig-list"></div>
+          </div>
+
+          <!-- Safe note -->
+          <div id="safe-note" style="display:none">
+            <div class="divider"></div>
+            <div class="safe-note">&#10003;&nbsp; No known risk signals detected in this input.</div>
+          </div>
+
+          <!-- Error display -->
+          <div id="err-box" style="display:none">
+            <div class="divider"></div>
+            <div class="error-box" id="err-msg"></div>
+          </div>
+
+        </div><!-- /r-body -->
+      </div><!-- /result -->
+
+    </main>
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+'use strict';
+
+/* ── State ────────────────────────────────────────────────── */
+let activeTab = 'url';
+
+const TAB_CFG = {
+  url:   { title: 'URL Analysis',    sub: '— Paste any URL to inspect',      btn: 'btn-url'   },
+  email: { title: 'Email Detection', sub: '— Paste email subject and body',   btn: 'btn-email' },
+  sms:   { title: 'SMS Detection',   sub: '— Paste the full SMS text',        btn: 'btn-sms'   },
+};
+
+/* ── Helpers ──────────────────────────────────────────────── */
+const $  = id => document.getElementById(id);
+const show = id => {
+  const el = $(id);
+  if (!el) {
+    console.error("Missing element:", id);
+    return;
+  }
+  el.style.display = 'block';
+};
+
+const hide = id => {
+  const el = document.getElementById(id);
+  console.log("HIDE CALLED:", id, el);  // 👈 IMPORTANT
+
+  if (!el) {
+    throw new Error("Element NOT FOUND → " + id); // 👈 FORCE ERROR
+  }
+
+  el.style.display = 'none';
+};
+
+/* ── Tab switching ────────────────────────────────────────── */
+function switchTab(tab) {
+  activeTab = tab;
+  ['url','email','sms'].forEach(t => {
+    $(('panel-' + t)).style.display = t === tab ? 'block' : 'none';
+    $('nav-' + t).classList.toggle('active', t === tab);
+  });
+  $('tb-title').textContent = TAB_CFG[tab].title;
+  $('tb-sub').textContent   = TAB_CFG[tab].sub;
+  hideResult();
+}
+
+function getInput() {
+  const ids = { url:'url-input', email:'email-input', sms:'sms-input' };
+  return $(ids[activeTab]).value.trim();
+}
+
+function clearAll() {
+  ['url-input','email-input','sms-input'].forEach(id => { $(id).value = ''; });
+  hideResult();
+}
+
+function hideResult() {
+  const el = $('result');
+  el.classList.remove('show');
+  el.style.display = 'none';
+}
+
+/* ── Scan ─────────────────────────────────────────────────── */
+async function runScan() {
+  const text = getInput();
+  if (!text) {
+    const inputId = { url:'url-input', email:'email-input', sms:'sms-input' }[activeTab];
+    $(inputId).focus();
+    return;
+  }
+
+  const btnId = TAB_CFG[activeTab].btn;
+  const btn   = $(btnId);
+  btn.classList.add('busy');
+  btn.disabled = true;
+  hideResult();
+
+  try {
+    const resp = await fetch('/api/check', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ type: activeTab, text }),
+    });
+
+    let data;
+    try { data = await resp.json(); }
+    catch(e) { showError('Server returned an invalid response. Check the Flask console for errors.'); return; }
+
+    if (!resp.ok || data.error) {
+      showError(data.error || `HTTP ${resp.status} error`);
+      return;
+    }
+
+    renderResult(data);
+
+  } catch (e) {
+    showError('Could not reach the server. Make sure Flask is running on port 5000.');
+  } finally {
+    btn.classList.remove('busy');
+    btn.disabled = false;
+  }
+}
+
+/* ── Show error inline ────────────────────────────────────── */
+function showError(msg) {
+  // Show result panel in a minimal "error" state
+  ['feat-sec','sig-sec','safe-note'].forEach(hide);
+  hide('conf');
+  hide('tiles');
+
+  // Use a simpler error card
+  const el = $('result');
+  el.style.display = 'block';
+  void el.offsetHeight;
+  el.classList.add('show');
+
+  $('verdict').className   = 'verdict danger';
+  $('v-icon').textContent  = '✕';
+  $('v-title').textContent = 'Analysis Error';
+  $('v-sub').textContent   = '';
+
+  show('err-box');
+  $('err-msg').textContent = msg;
+
+  hide('conf');
+  $('tiles').innerHTML = '';
+  $('tiles').style.display = 'none';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ── Render result ────────────────────────────────────────── */
+function renderResult(d) {
+  hide('err-box');
+  show('conf');
+  $('tiles').style.display = 'grid';
+
+  const safe = d.safe;
+
+  /* Verdict banner */
+  $('verdict').className  = 'verdict ' + (safe ? 'safe' : 'danger');
+  $('v-icon').textContent = safe ? '✓' : '✕';
+  $('v-title').textContent = d.label;
+  $('v-sub').textContent   = `Scanned in ${d.elapsed_ms} ms · Confidence ${d.confidence}%`;
+
+  /* Confidence bar */
+  $('conf-pct').textContent = d.confidence + '%';
+  const bar = $('bar-fill');
+  bar.style.width = '0';
+  bar.className   = 'bar-fill ' + (safe ? 'safe' : 'danger');
+  setTimeout(() => { bar.style.width = d.confidence + '%'; }, 50);
+
+  /* Score tiles */
+  const tiles = $('tiles');
+  if (d.type === 'url') {
+    tiles.innerHTML = `
+      <div class="tile">
+        <div class="tile-label">Legitimate Probability</div>
+        <div class="tile-value ${safe ? 'safe' : 'neutral'}">${d.legit_prob}%</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label">Phishing Probability</div>
+        <div class="tile-value ${!safe ? 'danger' : 'neutral'}">${d.phish_prob}%</div>
+      </div>`;
+  } else {
+    tiles.innerHTML = `
+      <div class="tile">
+        <div class="tile-label">Legitimate (Ham)</div>
+        <div class="tile-value ${safe ? 'safe' : 'neutral'}">${d.ham_prob}%</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label">Spam / Phishing</div>
+        <div class="tile-value ${!safe ? 'danger' : 'neutral'}">${d.spam_prob}%</div>
+      </div>`;
+  }
+
+  /* Feature table (URL only) */
+  if (d.features) {
+    show('feat-sec');
+    $('feat-table').innerHTML = Object.entries(d.features)
+      .map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+      .join('');
+  } else {
+    hide('feat-sec');
+  }
+
+  /* Risk signals */
+  if (d.risk_signals && d.risk_signals.length) {
+    show('sig-sec');
+    hide('safe-note');
+    $('sig-list').innerHTML = d.risk_signals.map((s, i) => `
+      <div class="risk-item" style="animation-delay:${i * 0.045}s">
+        <span class="risk-bullet">⚠</span>
+        <span>${s}</span>
+      </div>`).join('');
+  } else if (d.type === 'url') {
+    hide('sig-sec');
+    show('safe-note');
+  } else {
+    hide('sig-sec');
+    hide('safe-note');
+  }
+
+  /* Show panel */
+  const el = $('result');
+  el.style.display = 'block';
+  void el.offsetHeight;
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ── Enter key on URL input ───────────────────────────────── */
+$('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runScan();
+});
+
+/* ── Model status ─────────────────────────────────────────── */
+(async () => {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    const parts = [];
+    if (d.email_model) parts.push('Email / SMS');
+    if (d.url_model)   parts.push('URL');
+    $('sb-status').textContent = parts.length
+      ? parts.join(', ') + ' loaded'
+      : 'Models not loaded — check console';
+
+    if (!d.dataset_exists) {
+      $('tb-badge').style.cssText = 'background:var(--c-warn-bg);border-color:var(--c-warn-bd);color:var(--c-warn);';
+      $('tb-badge').innerHTML = '&#9679;&nbsp; Dataset missing';
+    }
+  } catch {
+    $('sb-status').textContent = 'Server offline';
+    $('pulse-dot').style.background = '#ef4444';
+    $('tb-badge').style.cssText = 'background:var(--c-danger-bg);border-color:var(--c-danger-bd);color:var(--c-danger);';
+    $('tb-badge').innerHTML = '&#9679;&nbsp; Offline';
+  }
+})();
+</script>
+
+</body>
+</html>
