@@ -722,6 +722,7 @@ def status():
 
 
 # ════════════════════════════════════════════════════════════════════════════
+load_or_train_models()
 if __name__ == "__main__":
     print("\n" + "═" * 56)
     print("  PhishGuard — AI Phishing Detection System  (FIXED)")
@@ -730,7 +731,7 @@ if __name__ == "__main__":
     print(f"  Dataset exists : {BASE_DATASET.exists()}")
     print("═" * 56)
     print("  Loading / training models…")
-    load_or_train_models()
+    
     print("═" * 56)
     print("  Open browser →  http://localhost:5000")
     print("═" * 56 + "\n")
