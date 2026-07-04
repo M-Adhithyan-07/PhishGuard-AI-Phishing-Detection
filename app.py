@@ -394,6 +394,8 @@ def load_or_train_models():
             email_model, email_vectorizer = train_email_sms_model()
         except Exception as e:
             print(f"  ✘ Email/SMS training failed: {e}")
+            import traceback
+            traceback.print_exc()
 
     # ── URL ──────────────────────────────────────────────────────────────────
     # Force retrain if the old model was trained WITH page-content features
@@ -426,6 +428,7 @@ def load_or_train_models():
             url_label_map = {"label_map": lmap, "legit_encoded": legit_enc}
         except Exception as e:
             print(f"  ✘ URL training failed: {e}")
+            import traceback
             traceback.print_exc()
 
 
